@@ -41,7 +41,7 @@ handle_cast({in, Value}, State) ->
 	Queue1 = queue:in(Value, queue:drop(Queue)),
 	Destination = State#state.destination,
 	Params = State#state.params,
-	Out1 = run(queue:to_list(Queue1), Params),
+	Out1 = run(lists:reverse(queue:to_list(Queue1)), Params),
 	case Destination of
 		{iir, Pid} -> filter_iir:in(Pid, Out1);
 		Pid when is_pid(Pid) -> Destination ! {out, self(), Out1}
@@ -61,7 +61,7 @@ code_change(_OldVsn, State, _Extra) ->
 %% internal functions
 
 run(Queue, Params) ->
-	run(Queue, lists:reverse(Params), []).
+	run(Queue, Params, []).
 
 run([], [], Result) ->
 	lists:sum(Result);
