@@ -32,30 +32,22 @@ init([Params, Dest]) ->
 		lists:seq(1, length(Params))),
 	{ok, #state{params = Params, queue = Queue, destination = Dest}}.
 
-handle_call(_Request, _From, State) ->
-	Reply = ok,
-	{reply, Reply, State}.
-
 handle_cast({in, Value}, State) ->
-	Queue = State#state.queue,
-	Queue1 = queue:in(Value, queue:drop(Queue)),
+	Queue = queue:in(Value, queue:drop(State#state.queue)),
 	Destination = State#state.destination,
 	Params = State#state.params,
-	Out1 = run(lists:reverse(queue:to_list(Queue1)), Params),
+	Out = run(lists:reverse(queue:to_list(Queue)), Params),
 	case Destination of
-		{iir, Pid} -> filter_iir:in(Pid, Out1);
-		Pid when is_pid(Pid) -> Destination ! {out, self(), Out1}
+		{iir, Pid} -> filter_iir:in(Pid, Out);
+		Pid when is_pid(Pid) -> Destination ! {out, self(), Out}
 	end,
-	{noreply, State#state{queue = Queue1}}.
+	{noreply, State#state{queue = Queue}}.
 
-handle_info(_Info, State) ->
-	{noreply, State}.
 
-terminate(_Reason, _State) ->
-	ok.
-
-code_change(_OldVsn, State, _Extra) ->
-	{ok, State}.
+handle_call(_Request, _From, State) -> {noreply, State}.
+handle_info(_Info, State) -> {noreply, State}.
+terminate(_Reason, _State) -> ok.
+code_change(_OldVsn, State, _Extra) -> {ok, State}.
 
 
 %% internal functions
