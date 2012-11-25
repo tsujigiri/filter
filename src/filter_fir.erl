@@ -35,14 +35,12 @@ init([Params, Dest]) ->
 
 handle_cast({in, In}, State) ->
 	Out = State#state.out,
-	Destination = State#state.destination,
-	case Destination of
+	case State#state.destination of
 		{iir, Pid} -> filter_iir:in(Pid, Out);
-		Pid when is_pid(Pid) -> Destination ! {out, self(), Out}
+		Pid when is_pid(Pid) -> Pid ! {out, self(), Out}
 	end,
-	Params = State#state.params,
 	Queue = queue:in(In, queue:drop(State#state.queue)),
-	Out1 = run(lists:reverse(queue:to_list(Queue)), Params),
+	Out1 = run(lists:reverse(queue:to_list(Queue)), State#state.params),
 	{noreply, State#state{queue = Queue, out = Out1}}.
 
 

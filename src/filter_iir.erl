@@ -35,11 +35,9 @@ init([Params, Dest]) ->
 
 handle_cast({in, In}, State) ->
 	Out = State#state.out,
-	Destination = State#state.destination,
-	Destination ! {out, self(), State#state.out},
-	Params = State#state.params,
+	State#state.destination ! {out, self(), Out},
 	Queue = State#state.queue,
-	Out1 = In + run(lists:reverse(queue:to_list(Queue)), Params),
+	Out1 = In + run(lists:reverse(queue:to_list(Queue)), State#state.params),
 	Queue1 = queue:in(Out, queue:drop(Queue)),
 	{noreply, State#state{queue = Queue1, out = Out1}}.
 
