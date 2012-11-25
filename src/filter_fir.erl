@@ -8,7 +8,7 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
 	terminate/2, code_change/3]).
 
--record(state, {params, destination, queue}).
+-record(state, {params, destination, queue, out = 0}).
 
 
 %% api
@@ -32,16 +32,18 @@ init([Params, Dest]) ->
 		lists:seq(1, length(Params))),
 	{ok, #state{params = Params, queue = Queue, destination = Dest}}.
 
-handle_cast({in, Value}, State) ->
-	Queue = queue:in(Value, queue:drop(State#state.queue)),
+
+handle_cast({in, In}, State) ->
+	Out = State#state.out,
 	Destination = State#state.destination,
-	Params = State#state.params,
-	Out = run(lists:reverse(queue:to_list(Queue)), Params),
 	case Destination of
 		{iir, Pid} -> filter_iir:in(Pid, Out);
 		Pid when is_pid(Pid) -> Destination ! {out, self(), Out}
 	end,
-	{noreply, State#state{queue = Queue}}.
+	Params = State#state.params,
+	Queue = queue:in(In, queue:drop(State#state.queue)),
+	Out1 = run(lists:reverse(queue:to_list(Queue)), Params),
+	{noreply, State#state{queue = Queue, out = Out1}}.
 
 
 handle_call(_Request, _From, State) -> {noreply, State}.

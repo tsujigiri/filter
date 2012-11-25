@@ -32,34 +32,28 @@ init([Params, Dest]) ->
 		lists:seq(1, length(Params))),
 	{ok, #state{params = Params, queue = Queue, destination = Dest}}.
 
-handle_call(_Request, _From, State) ->
-	Reply = ok,
-	{reply, Reply, State}.
 
-handle_cast({in, Value}, State) ->
+handle_cast({in, In}, State) ->
 	Out = State#state.out,
-	Queue = State#state.queue,
-	Queue1 = queue:in(Value + Out, queue:drop(Queue)),
 	Destination = State#state.destination,
+	Destination ! {out, self(), State#state.out},
 	Params = State#state.params,
-	Out1 = run(lists:reverse(queue:to_list(Queue1)), Params),
-	Destination ! {out, self(), Out1},
+	Queue = State#state.queue,
+	Out1 = In + run(lists:reverse(queue:to_list(Queue)), Params),
+	Queue1 = queue:in(Out, queue:drop(Queue)),
 	{noreply, State#state{queue = Queue1, out = Out1}}.
 
-handle_info(_Info, State) ->
-	{noreply, State}.
 
-terminate(_Reason, _State) ->
-	ok.
-
-code_change(_OldVsn, State, _Extra) ->
-	{ok, State}.
+handle_call(_Request, _From, State) -> {noreply, State}.
+handle_info(_Info, State) -> {noreply, State}.
+terminate(_Reason, _State) -> ok.
+code_change(_OldVsn, State, _Extra) -> {ok, State}.
 
 
 %% internal functions
 
 run(Queue, Params) ->
-	run(Queue, lists:reverse(Params), []).
+	run(Queue, Params, []).
 
 run([], [], Result) ->
 	lists:sum(Result);

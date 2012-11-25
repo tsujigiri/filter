@@ -9,8 +9,8 @@ before_suite() ->
 	register(test_filter_fir, Pid).
 
 test_filter_run() ->
-	ok = filter_in([0,1,0,-1,0,1,0,-1]),
-	[0,1,2,2,-2,-2,2,2] = filter_out(8, []).
+	ok = filter_in([1, 0.7, 0, -0.7, -1, -0.7, 0, 0.7]),
+	[0, 1, 2.7, 4.4, 1.3999999999999997, -2.4, -4.8, -4.4] = filter_out(8, []).
 
 
 % internal
