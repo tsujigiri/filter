@@ -5,7 +5,7 @@
 % tests
 
 before_suite() ->
-	{ok, Pid} = filter_fir:start_link([1,2,3], self()),
+	{ok, Pid} = filter:start_link(fir, [1,2,3], self()),
 	register(test_filter_fir, Pid).
 
 test_filter_run() ->
@@ -19,7 +19,7 @@ filter_in([]) -> ok;
 
 filter_in([Value | Values]) ->
 	Pid = whereis(test_filter_fir),
-	filter_fir:in(Pid, Value),
+	filter:in(Pid, Value),
 	filter_in(Values).
 
 filter_out(0, Values) ->
@@ -27,4 +27,4 @@ filter_out(0, Values) ->
 
 filter_out(ValueCount, Values) ->
 	Pid = whereis(test_filter_fir),
-	filter_out(ValueCount-1, [filter_fir:out(Pid) | Values]).
+	filter_out(ValueCount-1, [filter:out(Pid) | Values]).

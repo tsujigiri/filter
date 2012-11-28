@@ -4,8 +4,8 @@
 % tests
 
 before_suite() ->
-	{ok, Pid} = filter_iir:start_link([1,1], self()),
-	register(test_filter_iir, Pid).
+	{ok, Pid} = filter:start_link(iir, [1,1], self()),
+	register(test_filter, Pid).
 
 test_filter_run() ->
 	ok = filter_in([1, 0.7, 0, -0.7, -1, -0.7, 0, 0.7]),
@@ -17,13 +17,13 @@ test_filter_run() ->
 filter_in([]) -> ok;
 
 filter_in([Value | Values]) ->
-	Pid = whereis(test_filter_iir),
-	filter_iir:in(Pid, Value),
+	Pid = whereis(test_filter),
+	filter:in(Pid, Value),
 	filter_in(Values).
 
 filter_out(0, Values) ->
 	lists:reverse(Values);
 
 filter_out(ValueCount, Values) ->
-	Pid = whereis(test_filter_iir),
-	filter_out(ValueCount-1, [filter_iir:out(Pid) | Values]).
+	Pid = whereis(test_filter),
+	filter_out(ValueCount-1, [filter:out(Pid) | Values]).
