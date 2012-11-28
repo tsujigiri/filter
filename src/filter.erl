@@ -23,11 +23,11 @@ new(FirParams, IirParams, Destination) ->
 	{ok, Sup} = filter_sup_sup:start_child(),
 	IirOrDest = case length(IirParams) of
 		0 -> Destination;
-		_ -> filter_sup:start_child(Sup, filter_iir, IirParams, Destination)
+		_ -> filter_sup:start_child(Sup, iir, IirParams, Destination)
 	end,
 	Filter = case length(FirParams) of
 		0 -> IirOrDest;
-		_ -> filter_sup:start_child(Sup, filter_fir, FirParams, IirOrDest)
+		_ -> filter_sup:start_child(Sup, fir, FirParams, IirOrDest)
 	end,
 	Filter == Destination andalso supervisor:terminate_child(filter_sup_sup, Sup),
 	Filter.
