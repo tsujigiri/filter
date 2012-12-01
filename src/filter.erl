@@ -2,7 +2,7 @@
 -behaviour(gen_server).
 
 %% api
--export([start/0, stop/0, new/3, start_link/3, in/2, out/1]).
+-export([start/0, stop/0, new/3, start_link/4, in/2, out/1]).
 
 %% callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -10,39 +10,40 @@
 
 -record(state, {type, params, destination, queue, out = 0}).
 
-
 %% api
 
-start() ->
-	ok = application:start(filter).
+start() -> ok = application:start(filter).
 
-stop() ->
-	ok = application:stop(filter).
+stop() -> ok = application:stop(filter).
+
+
+start_link(Type, Ref, Params, Dest) ->
+	gen_server:start_link({via, gproc, {n, l, Ref}}, ?MODULE, [Type, Params, Dest], []).
+
 
 new(FirParams, IirParams, Destination) ->
-	{ok, Sup} = filter_sup_sup:start_child(),
 	IirOrDest = case length(IirParams) of
 		0 -> Destination;
-		_ -> filter_sup:start_child(Sup, iir, IirParams, Destination)
+		_ -> {iir, filter_sup:start_filter(iir, IirParams, Destination)}
 	end,
-	Filter = case length(FirParams) of
-		0 -> IirOrDest;
-		_ -> filter_sup:start_child(Sup, fir, FirParams, IirOrDest)
-	end,
-	Filter == Destination andalso supervisor:terminate_child(filter_sup_sup, Sup),
-	Filter.
+	case {length(FirParams), IirOrDest} of
+		{0, {iir, Ref}} -> Ref;
+		{0, Destination} -> Destination;
+		_ -> filter_sup:start_filter(fir, FirParams, IirOrDest)
+	end.
 
 
-start_link(Type, Params, Dest) ->
-	gen_server:start_link(?MODULE, [Type, Params, Dest], []).
+in(Filter, Value) ->
+	in(Filter, Filter, Value).
 
-in(Server, Value) ->
-	gen_server:cast(Server, {in, Value}),
+in(Ref, InputRef, Value) ->
+	gen_server:cast({via, gproc, {n, l, Ref}}, {in, InputRef, Value}),
 	ok.
 
-out(Server) ->
+
+out(Filter) ->
 	receive
-		{out, Server, Value} -> Value
+		{out, Filter, Value} -> Value
 	end.
 
 %% callbacks
@@ -50,29 +51,29 @@ out(Server) ->
 init([Type, Params, Dest]) ->
 	Queue = lists:foldl(fun(_, Q) -> queue:in(0, Q) end, queue:new(),
 		lists:seq(1, length(Params))),
-	{ok, #state{type = Type, params = Params, queue = Queue, destination = Dest}}.
+	{ok, #state{type = Type, params = Params, queue = Queue,
+			destination = Dest}}.
 
 
-handle_cast({in, In}, State = #state{type = fir}) ->
+handle_cast({in, InputRef, In}, State = #state{type = fir}) ->
 	Out = State#state.out,
 	Queue = queue:in(In, queue:drop(State#state.queue)),
 	case State#state.destination of
-		{iir, Pid} -> 
+		{iir, Ref} ->
 			Out1 = run(fir, lists:reverse(queue:to_list(Queue)), State#state.params),
-			filter_iir:in(Pid, Out);
-		Pid when is_pid(Pid) ->
-			Pid ! {out, self(), Out},
+			in(Ref, InputRef, Out1);
+		Pid ->
+			Pid ! {out, InputRef, Out},
 			Out1 = run(fir, lists:reverse(queue:to_list(Queue)), State#state.params)
 	end,
 	{noreply, State#state{queue = Queue, out = Out1}};
 
-handle_cast({in, In}, State = #state{type = iir}) ->
+handle_cast({in, InputRef, In}, State = #state{type = iir}) ->
 	Out = State#state.out,
-	State#state.destination ! {out, self(), Out},
-	Queue = State#state.queue,
+	State#state.destination ! {out, InputRef, Out},
+	Queue = queue:in(Out, queue:drop(State#state.queue)),
 	Out1 = In + run(iir, lists:reverse(queue:to_list(Queue)), State#state.params),
-	Queue1 = queue:in(Out, queue:drop(Queue)),
-	{noreply, State#state{queue = Queue1, out = Out1}}.
+	{noreply, State#state{queue = Queue, out = Out1}}.
 
 
 

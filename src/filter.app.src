@@ -1,11 +1,13 @@
 {application, filter,
  [
-  {description, ""},
-  {vsn, "1"},
+  {description, "Experimental implementation of FIR and IIR digital filters"},
+  {vsn, "0.0.1"},
   {registered, []},
   {applications, [
                   kernel,
-                  stdlib
+                  stdlib,
+                  sasl,
+                  gproc
                  ]},
   {mod, { filter_app, []}},
   {env, []}
