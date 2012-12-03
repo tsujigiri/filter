@@ -56,25 +56,20 @@ init([Type, Params, Dest]) ->
 
 
 handle_cast({in, InputRef, In}, State = #state{type = fir}) ->
-	Out = State#state.out,
 	Queue = queue:in(In, queue:drop(State#state.queue)),
+	Out = run(fir, lists:reverse(queue:to_list(Queue)), State#state.params),
 	case State#state.destination of
-		{iir, Ref} ->
-			Out1 = run(fir, lists:reverse(queue:to_list(Queue)), State#state.params),
-			in(Ref, InputRef, Out1);
-		Pid ->
-			Pid ! {out, InputRef, Out},
-			Out1 = run(fir, lists:reverse(queue:to_list(Queue)), State#state.params)
+		{iir, Ref} -> in(Ref, InputRef, Out);
+		Pid -> Pid ! {out, InputRef, Out}
 	end,
-	{noreply, State#state{queue = Queue, out = Out1}};
+	{noreply, State#state{queue = Queue}};
 
 handle_cast({in, InputRef, In}, State = #state{type = iir}) ->
-	Out = State#state.out,
+	Queue = State#state.queue,
+	Out = In + run(iir, lists:reverse(queue:to_list(Queue)), State#state.params),
 	State#state.destination ! {out, InputRef, Out},
-	Queue = queue:in(Out, queue:drop(State#state.queue)),
-	Out1 = In + run(iir, lists:reverse(queue:to_list(Queue)), State#state.params),
-	{noreply, State#state{queue = Queue, out = Out1}}.
-
+	Queue1 = queue:in(Out, queue:drop(Queue)),
+	{noreply, State#state{queue = Queue1, out = Out}}.
 
 
 handle_call(_Request, _From, State) -> {noreply, State}.
