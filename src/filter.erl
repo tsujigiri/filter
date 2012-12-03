@@ -49,26 +49,26 @@ out(Filter) ->
 %% callbacks
 
 init([Type, Params, Dest]) ->
-	Queue = lists:foldl(fun(_, Q) -> queue:in(0, Q) end, queue:new(),
+	Queue = lists:foldl(fun(_, Q) -> [0 | Q] end, [],
 		lists:seq(1, length(Params))),
 	{ok, #state{type = Type, params = Params, queue = Queue,
 			destination = Dest}}.
 
 
 handle_cast({in, InputRef, In}, State = #state{type = fir}) ->
-	Queue = queue:in(In, queue:drop(State#state.queue)),
-	Out = run(fir, lists:reverse(queue:to_list(Queue)), State#state.params),
+	Queue = [In | State#state.queue],
+	{Out, Queue1} = run(fir, Queue, State#state.params),
 	case State#state.destination of
 		{iir, Ref} -> in(Ref, InputRef, Out);
 		Pid -> Pid ! {out, InputRef, Out}
 	end,
-	{noreply, State#state{queue = Queue}};
+	{noreply, State#state{queue = Queue1}};
 
 handle_cast({in, InputRef, In}, State = #state{type = iir}) ->
-	Queue = State#state.queue,
-	Out = In + run(iir, lists:reverse(queue:to_list(Queue)), State#state.params),
+	{Loop, Queue} = run(iir, State#state.queue, State#state.params), 
+	Out = In + Loop,
 	State#state.destination ! {out, InputRef, Out},
-	Queue1 = queue:in(Out, queue:drop(Queue)),
+	Queue1 = [Out | Queue],
 	{noreply, State#state{queue = Queue1, out = Out}}.
 
 
@@ -81,13 +81,13 @@ code_change(_OldVsn, State, _Extra) -> {ok, State}.
 %% internal functions
 
 run(Type, Queue, Params) ->
-	run(Type, Queue, Params, []).
+	run(Type, Queue, Params, [], []).
 
-run(_Type, [], [], Result) ->
-	lists:sum(Result);
+run(_Type, _Queue, [], Result, NewQueue) ->
+	{lists:sum(Result), lists:reverse(NewQueue)};
 
-run(fir, [QueueItem | Queue], [Param | Params], Result) ->
-	run(fir, Queue, Params, [QueueItem * Param | Result]);
+run(fir, [QueueItem | Queue], [Param | Params], Result, NewQueue) ->
+	run(fir, Queue, Params, [QueueItem * Param | Result], [QueueItem | NewQueue]);
 
-run(iir, [QueueItem | Queue], [Param | Params], Result) ->
-	run(iir, Queue, Params, [QueueItem * -Param | Result]).
+run(iir, [QueueItem | Queue], [Param | Params], Result, NewQueue) ->
+	run(iir, Queue, Params, [QueueItem * -Param | Result], [QueueItem | NewQueue]).
