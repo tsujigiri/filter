@@ -2,7 +2,7 @@
 -behaviour(gen_server).
 
 %% api
--export([start/0, stop/0, new/3, start_link/4, in/2, out/1]).
+-export([new/3, start_link/4, in/2, out/1]).
 
 %% callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -10,17 +10,20 @@
 
 -record(state, {type, params, destination, queue, out = 0}).
 
+-type sample()       :: integer() | float().
+-type filter_param() :: integer() | float().
+-type filter_type()  :: fir | iir.
+-type filter()       :: reference() | pid().
+
 %% api
 
-start() -> ok = application:start(filter).
-
-stop() -> ok = application:stop(filter).
-
-
+-spec start_link(filter_type(), reference(), [filter_param()], pid()) ->
+	ignore | {error, _} | {ok, pid()}.
 start_link(Type, Ref, Params, Dest) ->
 	gen_server:start_link({via, gproc, {n, l, Ref}}, ?MODULE, [Type, Params, Dest], []).
 
 
+-spec new([filter_param()], [filter_param()], pid()) -> reference() | pid().
 new(FirParams, IirParams, Destination) ->
 	IirOrDest = case length(IirParams) of
 		0 -> Destination;
@@ -33,14 +36,17 @@ new(FirParams, IirParams, Destination) ->
 	end.
 
 
+-spec in(filter(), sample()) -> ok.
 in(Filter, Value) ->
 	in(Filter, Filter, Value).
 
+-spec in(reference(), reference(), sample()) -> ok.
 in(Ref, InputRef, Value) ->
 	gen_server:cast({via, gproc, {n, l, Ref}}, {in, InputRef, Value}),
 	ok.
 
 
+-spec out(filter()) -> sample().
 out(Filter) ->
 	receive
 		{out, Filter, Value} -> Value
@@ -80,9 +86,12 @@ code_change(_OldVsn, State, _Extra) -> {ok, State}.
 
 %% internal functions
 
+-spec run(filter_type(), [sample()], [filter_param()]) -> {sample(), [sample()]}.
 run(Type, Queue, Params) ->
 	run(Type, Queue, Params, [], []).
 
+-spec run(filter_type(), [sample()], [], [sample()], [sample()]) ->
+	{sample(), [sample()]}.
 run(_Type, _Queue, [], Result, NewQueue) ->
 	{lists:sum(Result), lists:reverse(NewQueue)};
 

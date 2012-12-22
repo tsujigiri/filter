@@ -4,10 +4,10 @@
 before_suite() ->
 	application:start(sasl),
 	application:start(gproc),
-	filter:start().
+	application:start(filter).
 
 after_suite() ->
-	filter:stop(),
+	application:stop(filter),
 	application:stop(gproc),
 	application:stop(sasl).
 
